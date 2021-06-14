@@ -1,24 +1,21 @@
-// SPDX-License-Identifier: EtherNaal
+//SPDX-License-Identifier: QLIPIT.io
+pragma solidity ^0.8.0;
 
-pragma solidity >=0.6.0 <0.8.0;
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC721/ERC721.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/Counters.sol";
 
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v3.0.0/contracts/token/ERC721/ERC721.sol";
-//import "https://github.com/OpenZeppelin/openzeppelin-contracts/tree/v3.0.0/contracts/access/AccessControl.sol";
 
-
-contract QLIP is ERC721{
+contract QLIPMarketplace is ERC721URIStorage{
 	//maps tokenIds to item indexes
+	using Counters for Counters.Counter;
+    Counters.Counter private _tokenIds;
 	mapping(uint256 => uint256) private itemIndex;
 	mapping(uint256 => uint256) private salePrice;
-	
-  //Setting the MINTER_ROLE as onlyMinter is deprecated 
-  //in the recent Solidity releases
-//   bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
-	constructor(string memory _name, string memory _symbol) public ERC721(_name, _symbol) {
-    //grantRole(MINTER_ROLE, msg.sender);
-    //Here, we should set the baseURI for the tokens(This can be set as the Pinata address)
-    _setBaseURI("https://gateway.pinata.cloud/ipfs/");
+
+	constructor(string memory _name, string memory _symbol) ERC721(_name, _symbol) {
+
     }
 
 	function setSale(uint256 tokenId, uint256 price) public {
@@ -32,30 +29,23 @@ contract QLIP is ERC721{
 		uint256 price = salePrice[tokenId];
         require(price != 0, "buyToken: price equals 0");
         require(msg.value == price, "buyToken: price doesn't equal salePrice[tokenId]");
-		address payable owner = address(uint160(ownerOf(tokenId)));
+		address payable owner = payable((ownerOf(tokenId)));
 		approve(address(this), tokenId);
 		salePrice[tokenId] = 0;
 		transferFrom(owner, msg.sender, tokenId);
         owner.transfer(msg.value);
 	}
 
-	function mintWithIndex(address to, uint256 index, string memory tokenURI) public  {
-    // require(
-    //         // /hasRole(MINTER_ROLE, msg.sender),
-    //         // "Token: account does not have minter role"
-    // );
-		uint256 tokenId = totalSupply() + 1;
-		itemIndex[tokenId] = index;
+	function mintWithIndex(address to, string memory tokenURI) public  {
+        
+        _tokenIds.increment();
+        uint256 tokenId = _tokenIds.current();
         _mint(to, tokenId);
         
         //Here, we will set the metadata hash link of the token metadata from Pinata
         _setTokenURI(tokenId, tokenURI);
 	}
 	
-
-	function getItemIndex(uint256 tokenId) public view returns (uint256) {
-		return itemIndex[tokenId];
-	}
 
 	function getSalePrice(uint256 tokenId) public view returns (uint256) {
 		return salePrice[tokenId];
