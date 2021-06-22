@@ -12,6 +12,8 @@ contract QLIPMarketplaceWithBidding is ERC721URIStorage{
     Counters.Counter private _tokenIds;
 	mapping(uint256 => uint256) private itemIndex;
 	mapping(uint256 => uint256) private salePrice;
+	mapping(uint256=> NFTDet) public TokenDetails;
+	uint256 _ToIds;
 	
   //Setting the MINTER_ROLE as onlyMinter is deprecated 
   //in the recent Solidity releases
@@ -21,6 +23,14 @@ contract QLIPMarketplaceWithBidding is ERC721URIStorage{
 
     //_setBaseURI("https://example.com/tokens/");
   }
+  
+  struct NFTDet{
+      uint256 _id;
+      uint16 _category;
+      string tokenURI_;
+  }
+  
+  
 
 	function setSale(uint256 tokenId, uint256 price) public {
 		address owner = ownerOf(tokenId);
@@ -40,21 +50,36 @@ contract QLIPMarketplaceWithBidding is ERC721URIStorage{
         owner.transfer(msg.value);
 	}
 
-function mintWithIndex(address to, string memory tokenURI) public  {
+//category numbers must be mapped from frontend
+function mintWithIndex(address to, string memory tokenURI,uint16 _category) public  {
         
         _tokenIds.increment();
         uint256 tokenId = _tokenIds.current();
         _mint(to, tokenId);
-        
+        TokenDetails[tokenId]._id=tokenId;
+        TokenDetails[tokenId]._category=_category;
         //Here, we will set the metadata hash link of the token metadata from Pinata
         _setTokenURI(tokenId, tokenURI);
+        TokenDetails[tokenId].tokenURI_=tokenURI;
 	}
 
 
 	function getSalePrice(uint256 tokenId) public view returns (uint256) {
 		return salePrice[tokenId];
 	}
+	
+	//resolve this in the frontend
+	function getTokenCategory(uint256 tokenId) public view returns(uint256){
+	    return TokenDetails[tokenId]._category;
+	}
+	
+	function getAllTokenDetails(uint256 tokenId) public view returns(NFTDet memory Details){
+	    Details._id=TokenDetails[tokenId]._id;
+	    Details._category=TokenDetails[tokenId]._category;
+	    Details.tokenURI_=TokenDetails[tokenId].tokenURI_;
+	}
 }
+
 
 /**
  * @title Ownable
