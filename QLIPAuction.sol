@@ -1,60 +1,11 @@
-//SPDX-License-Identifier: QLIPIT.io
-pragma solidity ^0.8.0;
+//SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.2;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC721/ERC721.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/Counters.sol";
-
-contract QLIPMarketplaceWithBidding is ERC721URIStorage{
-	//maps tokenIds to item indexes
-	//maps tokenIds to item indexes
-	using Counters for Counters.Counter;
-    Counters.Counter private _tokenIds;
-	mapping(uint256 => uint256) private itemIndex;
-	mapping(uint256 => uint256) private salePrice;
-	
-  //Setting the MINTER_ROLE as onlyMinter is deprecated 
-  //in the recent Solidity releases
-  bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
-
-	constructor(string memory _name, string memory _symbol) ERC721(_name, _symbol) {
-
-    //_setBaseURI("https://example.com/tokens/");
-  }
-
-	function setSale(uint256 tokenId, uint256 price) public {
-		address owner = ownerOf(tokenId);
-        require(owner != address(0), "setSale: nonexistent token");
-        require(owner == msg.sender, "setSale: msg.sender is not the owner of the token");
-		salePrice[tokenId] = price;
-	}
-
-	function buyTokenOnSale(uint256 tokenId) public payable {
-		uint256 price = salePrice[tokenId];
-        require(price != 0, "buyToken: price equals 0");
-        require(msg.value == price, "buyToken: price doesn't equal salePrice[tokenId]");
-		address payable owner = payable(address(uint160(ownerOf(tokenId))));
-		approve(address(this), tokenId);
-		salePrice[tokenId] = 0;
-		transferFrom(owner, msg.sender, tokenId);
-        owner.transfer(msg.value);
-	}
-
-function mintWithIndex(address to, string memory tokenURI) public  {
-        
-        _tokenIds.increment();
-        uint256 tokenId = _tokenIds.current();
-        _mint(to, tokenId);
-        
-        //Here, we will set the metadata hash link of the token metadata from Pinata
-        _setTokenURI(tokenId, tokenURI);
-	}
-
-
-	function getSalePrice(uint256 tokenId) public view returns (uint256) {
-		return salePrice[tokenId];
-	}
-}
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/access/AccessControl.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/access/AccessControlEnumerable.sol";
 
 /**
  * @title Ownable
@@ -180,11 +131,9 @@ contract Destructible is Ownable {
 }
 
 
-contract NFTSale is Ownable, Pausable, Destructible {
+contract QLIPAuction is Ownable, Pausable, Destructible {
 
-    event Sent(address indexed payee, uint256 amount, uint256 balance);
-    event Received(address indexed payer, uint tokenId, uint256 amount, uint256 balance);
-    event Donated(address indexed charity, uint256 amount);
+    event SetSale(address nftAddress, uint256 tokenId);
     event TokenTransferred(address indexed owner, address indexed receiver, uint256 tokenId);
     
     struct Token {
@@ -196,8 +145,11 @@ contract NFTSale is Ownable, Pausable, Destructible {
 
     ERC721 public nftAddress;
     address payable nftOwner;
+    address public admin;
     mapping(uint256 => uint256) private salePrice;
     mapping(uint256 => Token) public tokens;
+    
+    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN");
     
     //Holds a mapping between the tokenId and the bidding contract
     mapping(uint256 => Bidding) tokenBids;
@@ -209,10 +161,17 @@ contract NFTSale is Ownable, Pausable, Destructible {
     */
     constructor(address _nftAddress) { 
         require(_nftAddress != address(0) && _nftAddress != address(this));
+        _setupRole(ADMIN_ROLE, msg.sender);
         nftAddress = ERC721(_nftAddress);
-        nftOwner = payable(msg.sender);
     }
 
+    function changeRole(address newAdmin) public {
+        require(hasRole(ADMIN_ROLE, msg.sender), "QLIPAuction: Only current admin can call this function");
+        
+        //Should we revoke older one and grant new one or have 2 admins for a fallback if required?
+        grantRole(ADMIN_ROLE, newAdmin);
+    }
+    
     /**
      * @dev check the owner of a Token
      * @param _tokenId uint256 token representing an Object
@@ -226,20 +185,22 @@ contract NFTSale is Ownable, Pausable, Destructible {
     /**
      * @dev Sell _tokenId for price 
      */
-    //TODO: Add require condition such that one token cannot be set for sale multiple times.
     function setSale(uint256 _tokenId, uint256 _price, uint _biddingTime) public returns(address) {
 		require(nftAddress.ownerOf(_tokenId) != address(0), "setSale: nonexistent token");
+		require(hasRole(ADMIN_ROLE, msg.sender), "QLIPAuction: Only admin can set the token for sale");
 		//require(tokens[_tokenId].active != true, "Token Already up for sale");
         Token memory token;
 		token.id = _tokenId;
 		token.active = true;
 		token.salePrice = _price;
 		tokens[_tokenId] = token;
+		nftOwner = nftAddress.ownerOf(_tokenId);
 		
 		Bidding placeBids = new Bidding(_tokenId, _biddingTime, _price, nftOwner);
 		tokenBids[_tokenId] = placeBids;
     
-    return(address(placeBids));
+        emit SetSale(nftAddress, _tokenId);
+        return(address(placeBids));
 		
 	} 
 
@@ -252,6 +213,7 @@ contract NFTSale is Ownable, Pausable, Destructible {
         require(msg.sender != address(0) && msg.sender != address(this));
         require(nftAddress.ownerOf(_tokenId) != address(0));
         require(tokens[_tokenId].active == true, "Token is not registered for sale!");
+        require(hasRole(ADMIN_ROLE, msg.sender), "QLIPAuction: Only the admin can call this function");
         
         /*
         De-registering the token once it's purchased.
@@ -280,6 +242,7 @@ contract NFTSale is Ownable, Pausable, Destructible {
     * @param _tokenId: Teokn ID to get the Bidding contract address
     */
     function getBiddingContractAddress(uint256 _tokenId) public view returns(address){
+        require(hasRole(ADMIN_ROLE, msg.sender), "QLIPAuction: Only admin can call this function");
         return(address(tokenBids[_tokenId]));
     }
 
