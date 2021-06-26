@@ -131,9 +131,9 @@ contract Destructible is Ownable {
 }
 
 
-contract QLIPAuction is Ownable, Pausable, Destructible {
+contract QLIPAuction is Ownable, Pausable, Destructible, AccessControl {
 
-    event SetSale(address nftAddress, uint256 tokenId);
+    event SetSale(ERC721 nftAddress, uint256 tokenId, uint256 tokenPrice);
     event TokenTransferred(address indexed owner, address indexed receiver, uint256 tokenId);
     
     struct Token {
@@ -157,12 +157,10 @@ contract QLIPAuction is Ownable, Pausable, Destructible {
 
     /**
     * @dev Contract Constructor
-    * @param _nftAddress address for the non-fungible token contract 
     */
-    constructor(address _nftAddress) { 
-        require(_nftAddress != address(0) && _nftAddress != address(this));
+    constructor() { 
         _setupRole(ADMIN_ROLE, msg.sender);
-        nftAddress = ERC721(_nftAddress);
+        admin = msg.sender;
     }
 
     function changeRole(address newAdmin) public {
@@ -172,6 +170,22 @@ contract QLIPAuction is Ownable, Pausable, Destructible {
         grantRole(ADMIN_ROLE, newAdmin);
     }
     
+    /**
+     * @dev NFT Owner sets the price of the _tokenId to _price and the nftaddress is captured 
+     * in the variable nftAddress
+     */
+    function setNFTDetailsForSale(uint256 _tokenId, address _nftAddress, uint256 _price) public {
+        nftAddress = ERC721(_nftAddress);
+        require(nftAddress.ownerOf(_tokenId) == msg.sender, "QLIPAuction: Only NFT Owner can set an NFT for sale");
+        
+        
+        Token memory token;
+		token.id = _tokenId;
+		token.active = true;
+		token.salePrice = _price;
+		tokens[_tokenId] = token;
+        
+    }
     /**
      * @dev check the owner of a Token
      * @param _tokenId uint256 token representing an Object
@@ -183,23 +197,20 @@ contract QLIPAuction is Ownable, Pausable, Destructible {
     }
     
     /**
-     * @dev Sell _tokenId for price 
+     * @dev Sell _tokenId for price - called by QLIP Admin
      */
-    function setSale(uint256 _tokenId, uint256 _price, uint _biddingTime) public returns(address) {
+    function setSale(uint256 _tokenId, uint _biddingTime) public returns(address) {
 		require(nftAddress.ownerOf(_tokenId) != address(0), "setSale: nonexistent token");
 		require(hasRole(ADMIN_ROLE, msg.sender), "QLIPAuction: Only admin can set the token for sale");
-		//require(tokens[_tokenId].active != true, "Token Already up for sale");
-        Token memory token;
-		token.id = _tokenId;
-		token.active = true;
-		token.salePrice = _price;
-		tokens[_tokenId] = token;
-		nftOwner = nftAddress.ownerOf(_tokenId);
+		require(tokens[_tokenId].active == true, "Token As not up for sale");
 		
-		Bidding placeBids = new Bidding(_tokenId, _biddingTime, _price, nftOwner);
+        Token memory saleToken = tokens[_tokenId];
+        
+		
+		Bidding placeBids = new Bidding(_tokenId, _biddingTime, saleToken.salePrice, nftOwner, payable(admin));
 		tokenBids[_tokenId] = placeBids;
     
-        emit SetSale(nftAddress, _tokenId);
+        emit SetSale(nftAddress, _tokenId, saleToken.salePrice);
         return(address(placeBids));
 		
 	} 
@@ -265,6 +276,8 @@ contract Bidding {
     address payable public owner;
     uint public charityAmount;
     uint public highestBid;
+    address public admin;
+    address public nftOwner;
 
     struct Bid {
         address payable bidder;
@@ -293,7 +306,8 @@ contract Bidding {
         uint256 _tokenId,
         uint _biddingTime,
         uint _reservePrice,
-        address payable _owner
+        address payable _nftOwner,
+        address payable _admin
     ) {
         reservePrice = _reservePrice;
         tokenId = _tokenId;
@@ -301,18 +315,19 @@ contract Bidding {
         auctionEnd = block.timestamp + _biddingTime;
         //Explicitly setting the owner to our address for now
         // msg.sender is coming as the address of the contract
-        owner = _owner;
+        nftOwner = _nftOwner;
+        admin = _admin;
         
     }
 
-    modifier onlyOwner() {
-        require(msg.sender == owner);
+    modifier onlyAdmin() {
+        require(msg.sender == admin);
         _;
     }
     
     //ONLY FOR TESTING
-    function getOwner() public view returns(address){
-      return owner;
+    function getAdmin() public view returns(address){
+      return admin;
     }
 
     /// Bid on the auction with the value sent
@@ -350,18 +365,18 @@ contract Bidding {
     /*
     * Get the address of the highest bidder
     */
-    function highestBidder() onlyOwner public returns(address) {
+    function highestBidder() onlyAdmin public returns(address) {
         
         uint highestBidValue;
         
         highestBidValue = bids[0].bidAmount;
-        highestBidAddress = payable(address(0));
+        highestBidAddress = address(0);
         
         for(uint i = 0; i <= bidCounter ; i ++){
             
             if(bids[i].bidAmount > highestBidValue) {
                 highestBidValue = bids[i].bidAmount;
-                highestBidAddress = payable(bids[i].bidder);
+                highestBidAddress = bids[i].bidder;
             }
                 
         }
@@ -375,7 +390,7 @@ contract Bidding {
     * Get the highest bid amount
     * @param _highestBidder address of the highest bidder
     */
-    function highestBidAmount(address _highestBidder) onlyOwner public view returns(uint)  {
+    function highestBidAmount(address _highestBidder) onlyAdmin public view returns(uint)  {
         
         for(uint i = 0; i <= bidCounter ; i ++){
             
@@ -391,11 +406,11 @@ contract Bidding {
     * Function to send the bidAmount to the NFT owner
     * @param _nftOwner: address of the NFT Owner
     */
-     function sendMoneyToOwner(address payable _nftOwner, uint salePrice) onlyOwner public {
+     function sendMoneyToOwner(uint salePrice) onlyAdmin public {
         require(block.timestamp >= auctionEnd, "Auction not yet ended.");
         require(ended, "Auction end has not been called.");
         //Send the money to the nftOwner
-        _nftOwner.transfer(salePrice);
+        payable(nftOwner).transfer(salePrice);
         
     }
 
@@ -404,7 +419,7 @@ contract Bidding {
     * @param _royalty: address of the royalty
     * @param _royaltyAmount: amount of money to be sent to the royalty
     */
-    function sendRoyaltyMoney(address payable _royalty, uint _royaltyAmount) onlyOwner public {
+    function sendRoyaltyMoney(address payable _royalty, uint _royaltyAmount) onlyAdmin public {
         require(block.timestamp >= auctionEnd, "Auction not yet ended.");
         require(ended, "Auction end has not been called.");
         _royalty.transfer(_royaltyAmount);
@@ -415,16 +430,18 @@ contract Bidding {
     * @param _qlipAddress: QLIP Address
     * @param _qlipAmount: amount of money to be sent to QLIP
     */
-    function sendQLIPMoney(address payable _qlipAddress, uint _qlipAmount) onlyOwner public {
+    function sendQLIPMoney(uint _qlipAmount) onlyAdmin public {
         require(block.timestamp >= auctionEnd, "Auction not yet ended.");
         require(ended, "Auction end has not been called.");
-        _qlipAddress.transfer(_qlipAmount);
+        payable(admin).transfer(_qlipAmount);
     }
     
     /*
     * Withdraw bids that were not the winners.
     */
-    function disperseFunds() onlyOwner public returns (bool) {
+    function disperseFunds() onlyAdmin public returns (bool) {
+        require(block.timestamp >= auctionEnd, "Auction not yet ended.");
+        require(ended, "Auction end has not been called.");
         uint amount = 0;
         for(uint i = 0; i <= bidCounter; i ++){
             amount = bids[i].bidAmount;
@@ -446,8 +463,8 @@ contract Bidding {
     * In case of an emergency, this function can be called to send all
     * the funds from the contract to the owner address.
     */
-    function finalize() onlyOwner public  {
-        selfdestruct(owner);
+    function finalize() onlyAdmin public  {
+        selfdestruct(payable(admin));
     }
     
     
@@ -455,7 +472,7 @@ contract Bidding {
     * @param _charity - Address of the charity organisation chosen by the NFT Owner
     * End the auction and send the highest bid to the nftOwner.
     */
-    function auctionEnded() onlyOwner public {
+    function auctionEnded() onlyAdmin public {
 
         // 1. Conditions
         require(block.timestamp >= auctionEnd, "Auction not yet ended.");
@@ -472,11 +489,11 @@ contract Bidding {
         
     }
 
-    function geReservePrice() onlyOwner  public view returns(uint){
+    function geReservePrice() onlyAdmin  public view returns(uint){
       return reservePrice;
     }
 
-    function getHighestBid() onlyOwner public view returns(uint){
+    function getHighestBid() onlyAdmin public view returns(uint){
       require(ended, "Auction end has not been called.");
       return highestBid;
     }
