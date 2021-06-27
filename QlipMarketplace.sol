@@ -14,7 +14,13 @@ contract QLIPMarketplace is ERC721URIStorage, AccessControl{
     Counters.Counter private _tokenIds;
 	mapping(uint256 => uint256) private itemIndex;
 	mapping(uint256 => uint256) private salePrice;
+	mapping(uint256=> NFTDet) public TokenDetails;
 	address public admin;
+	struct NFTDet{
+      uint256 _id;
+      uint16 _category;
+      string tokenURI_;
+  }
 	
     //Setting the MINTER_ROLE as onlyMinter is deprecated 
     //in the recent Solidity releases
@@ -73,18 +79,27 @@ contract QLIPMarketplace is ERC721URIStorage, AccessControl{
         owner.transfer(ownerAmount);
 	}
 
-    function mintWithIndex(address to, string memory tokenURI) public  {
+    function mintWithIndex(address to, string memory tokenURI,uint16 _category) public  {
         require(hasRole(MINTER_ROLE, msg.sender), "QLIPMarketplace: Only whitelisted minters can mint a token");
         _tokenIds.increment();
         uint256 tokenId = _tokenIds.current();
         _mint(to, tokenId);
+        TokenDetails[tokenId]._id=tokenId;
+        TokenDetails[tokenId]._category=_category;
         
         //Here, we will set the metadata hash link of the token metadata from Pinata
         _setTokenURI(tokenId, tokenURI);
+         TokenDetails[tokenId].tokenURI_=tokenURI;
 	}
 
 
 	function getSalePrice(uint256 tokenId) public view returns (uint256) {
 		return salePrice[tokenId];
+	}
+	
+	function getAllTokenDetails(uint256 tokenId) public view returns(NFTDet memory Details){
+	    Details._id=TokenDetails[tokenId]._id;
+	    Details._category=TokenDetails[tokenId]._category;
+	    Details.tokenURI_=TokenDetails[tokenId].tokenURI_;
 	}
 }
