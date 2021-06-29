@@ -206,6 +206,7 @@ contract QLIPAuction is Ownable, Pausable, Destructible, AccessControl {
 		
         Token memory saleToken = tokens[_tokenId];
         
+        nftOwner = payable(nftAddress.ownerOf(_tokenId));
 		
 		Bidding placeBids = new Bidding(_tokenId, _biddingTime, saleToken.salePrice, nftOwner, payable(admin));
 		tokenBids[_tokenId] = placeBids;
@@ -273,8 +274,6 @@ contract Bidding {
     uint public reservePrice;
     uint bidCounter;
     address public highestBidAddress;
-    address payable public owner;
-    uint public charityAmount;
     uint public highestBid;
     address public admin;
     address public nftOwner;
@@ -328,7 +327,7 @@ contract Bidding {
     //ONLY FOR TESTING
     function getAdmin() public view returns(address){
       return admin;
-    }
+    }   
 
     /// Bid on the auction with the value sent
     /// together with this transaction.
@@ -351,8 +350,8 @@ contract Bidding {
         // If the bid is not higher than the reservePrice, send the
         // money back.
         require(
-            msg.value > reservePrice,
-            "The bid value is less than the reserve price."
+            msg.value > 0,
+            "You cannot bid 0 as the price."
         );
 
        Bid storage newBid = bids[bidCounter+1];
