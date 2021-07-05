@@ -16,6 +16,7 @@ contract QLIPMarketplace is ERC721URIStorage, AccessControl{
 	mapping(uint256 => uint256) private salePrice;
 	mapping(uint256=> NFTDet) public TokenDetails;
 	address public admin;
+	
 	struct NFTDet{
       uint256 _id;
       uint16 _category;
@@ -86,9 +87,7 @@ contract QLIPMarketplace is ERC721URIStorage, AccessControl{
         _mint(to, tokenId);
         TokenDetails[tokenId]._id=tokenId;
         TokenDetails[tokenId]._category=_category;
-        
-        //Here, we will set the metadata hash link of the token metadata from Pinata
-        _setTokenURI(tokenId, tokenURI);
+       _setTokenURI(tokenId, tokenURI);
          TokenDetails[tokenId].tokenURI_=tokenURI;
 	}
 
@@ -97,9 +96,13 @@ contract QLIPMarketplace is ERC721URIStorage, AccessControl{
 		return salePrice[tokenId];
 	}
 	
-	function getAllTokenDetails(uint256 tokenId) public view returns(NFTDet memory Details){
+	
+		function getAllTokenDetails(uint256 tokenId) public view returns(NFTDet memory Details){
 	    Details._id=TokenDetails[tokenId]._id;
 	    Details._category=TokenDetails[tokenId]._category;
 	    Details.tokenURI_=TokenDetails[tokenId].tokenURI_;
+	     //Here, we will set the metadata hash link of the token metadata from Pinata
+        
 	}
 }
+

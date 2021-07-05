@@ -1,6 +1,6 @@
 {
 	"compiler": {
-		"version": "0.8.4+commit.c7e474f2"
+		"version": "0.8.6+commit.11564f7e"
 	},
 	"language": "Solidity",
 	"output": {
@@ -807,24 +807,24 @@
 		"compilationTarget": {
 			"QlipMarketplace.sol": "QLIPMarketplace"
 		},
-		"evmVersion": "istanbul",
+		"evmVersion": "berlin",
 		"libraries": {},
 		"metadata": {
 			"bytecodeHash": "ipfs"
 		},
 		"optimizer": {
-			"enabled": true,
+			"enabled": false,
 			"runs": 200
 		},
 		"remappings": []
 	},
 	"sources": {
 		"QlipMarketplace.sol": {
-			"keccak256": "0x7d3e0c28cbc9fe6fb6fe127cbeb132ae7335b1e980ff1280eb6a78c8549abe0b",
+			"keccak256": "0xa2839fd36e5b1e24b9ecf234a1f55905d5e8ad9ed4044c22edf78803f04d5c89",
 			"license": "UNLICENSED",
 			"urls": [
-				"bzz-raw://401d2d1263d85d9d9825bf9c29120b7100066e83232399a29bd34be17a28accf",
-				"dweb:/ipfs/QmQiYnZZNnh4SqyPYGUqSPPmqCsWdLKs4oVwHZu1ZauShn"
+				"bzz-raw://0839b8b57b5fa46e4a992924dd6cdb43001e038d7f064f4a4acf284a966078a2",
+				"dweb:/ipfs/QmeVhvyCeeaEy21wLZyxvR1bPRDKTcSixvqUHKN1jMXWC6"
 			]
 		},
 		"https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/access/AccessControl.sol": {
