@@ -23,14 +23,20 @@ contract QLIPMarketplace is ERC721URIStorage, AccessControl{
       string tokenURI_;
   }
 	
+	mapping(address => bool) whitelistedMinters;
+	
+	modifier onlyAdmin() {
+	    require(msg.sender == admin);
+	    _;
+	}
     //Setting the MINTER_ROLE as onlyMinter is deprecated 
     //in the recent Solidity releases
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
-    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN");
+    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     
 	constructor(string memory _name, string memory _symbol) ERC721(_name, _symbol) {
-        _setupRole(ADMIN_ROLE, msg.sender);
-        _setupRole(MINTER_ROLE, msg.sender);
+	   // _setRoleAdmin(ADMIN_ROLE, DEFAULT_ADMIN_ROLE);
+    //     _setupRole(ADMIN_ROLE, msg.sender);
         admin = msg.sender;
         
         //Need to fill this up based on Pinata
@@ -41,21 +47,22 @@ contract QLIPMarketplace is ERC721URIStorage, AccessControl{
         return super.supportsInterface(interfaceId);
     }
     
-    function whiteListMinters(address minter) public {
-        require(hasRole(ADMIN_ROLE, msg.sender), "QLIPMarketplace: Only admin can whitelist a minter");
-        grantRole(MINTER_ROLE, minter);
+    function whiteListMinters(address minter) public onlyAdmin {
+        //require(hasRole(ADMIN_ROLE, msg.sender), "QLIPMarketplace: Only admin can whitelist a minter");
+        whitelistedMinters[minter] = true;
+        //grantRole(MINTER_ROLE, minter);
     }
     
     
-    function changeRole(address newAdmin) public {
-        require(hasRole(ADMIN_ROLE, msg.sender), "QLIPAuction: Only current admin can call this function");
+    function changeRole(address newAdmin) public onlyAdmin {
+        //require(hasRole(ADMIN_ROLE, msg.sender), "QLIPAuction: Only current admin can call this function");
         
         //Should we revoke older one and grant new one or have 2 admins for a fallback if required?
-        grantRole(ADMIN_ROLE, newAdmin);
+        admin = newAdmin;
     }
 
-	function setSale(uint256 tokenId, uint256 price) public {
-	    require(hasRole(ADMIN_ROLE, msg.sender), "QLIPMarketplace: Only the admin can set the token for sale");
+	function setSale(uint256 tokenId, uint256 price) public onlyAdmin {
+	    //require(hasRole(ADMIN_ROLE, msg.sender), "QLIPMarketplace: Only the admin can set the token for sale");
 		address owner = ownerOf(tokenId);
         require(owner != address(0), "setSale: nonexistent token");
         require(owner == msg.sender, "setSale: msg.sender is not the owner of the token");
@@ -81,7 +88,8 @@ contract QLIPMarketplace is ERC721URIStorage, AccessControl{
 	}
 
     function mintWithIndex(address to, string memory tokenURI,uint16 _category) public  {
-        require(hasRole(MINTER_ROLE, msg.sender), "QLIPMarketplace: Only whitelisted minters can mint a token");
+        //require(hasRole(MINTER_ROLE, msg.sender), "QLIPMarketplace: Only whitelisted minters can mint a token");
+        require(whitelistedMinters[msg.sender] == true, "QLIPMarketplace: Only whitelisted minters can mint a token");
         _tokenIds.increment();
         uint256 tokenId = _tokenIds.current();
         _mint(to, tokenId);
@@ -105,4 +113,3 @@ contract QLIPMarketplace is ERC721URIStorage, AccessControl{
         
 	}
 }
-
