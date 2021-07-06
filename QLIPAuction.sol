@@ -133,7 +133,7 @@ contract Destructible is Ownable {
 
 contract QLIPAuction is Ownable, Pausable, Destructible, AccessControl {
 
-    event SetSale(ERC721 nftAddress, uint256 tokenId, uint256 tokenPrice);
+    event SetSale(ERC721 nftAddress, uint256 tokenId, uint256 tokenPrice,address indexed biddingAddress);
     event TokenTransferred(address indexed owner, address indexed receiver, uint256 tokenId);
     
     struct Token {
@@ -211,7 +211,7 @@ contract QLIPAuction is Ownable, Pausable, Destructible, AccessControl {
 		Bidding placeBids = new Bidding(_tokenId, _biddingTime, saleToken.salePrice, nftOwner, payable(admin));
 		tokenBids[_tokenId] = placeBids;
     
-        emit SetSale(nftAddress, _tokenId, saleToken.salePrice);
+        emit SetSale(nftAddress, _tokenId, saleToken.salePrice,address(placeBids));
         return(address(placeBids));
 		
 	} 
@@ -225,6 +225,7 @@ contract QLIPAuction is Ownable, Pausable, Destructible, AccessControl {
         require(msg.sender != address(0) && msg.sender != address(this));
         require(nftAddress.ownerOf(_tokenId) != address(0));
         require(tokens[_tokenId].active == true, "Token is not registered for sale!");
+        
         require(hasRole(ADMIN_ROLE, msg.sender), "QLIPAuction: Only the admin can call this function");
         
         /*
@@ -233,12 +234,12 @@ contract QLIPAuction is Ownable, Pausable, Destructible, AccessControl {
         Token memory sellingToken = tokens[_tokenId];
         sellingToken.active = false;
         tokens[_tokenId] = sellingToken;
-        
-                
+        address highestBidder;
+        uint256 _amount;
+               
         address tokenSeller = nftAddress.ownerOf(_tokenId);
-        address highestBidder = tokenBids[_tokenId].highestBidder();
+        (highestBidder,_amount) = tokenBids[_tokenId].highestBidder();
         nftAddress.safeTransferFrom(tokenSeller, highestBidder, _tokenId);
-        
         emit TokenTransferred(tokenSeller, highestBidder, _tokenId);
         
     }
@@ -293,6 +294,7 @@ contract Bidding {
     // Events that  will be fired on changes.
     //event HighestBidIncreased(address bidder, uint amount);
     event AuctionEnded(address winner, uint amount);
+    event newbid(address indexed bidder,uint256 amount);
 
     /*
     * Create a simple bidding contract
@@ -347,8 +349,7 @@ contract Bidding {
             "Auction already ended."
         );
 
-        // If the bid is not higher than the reservePrice, send the
-        // money back.
+        // If the bid is not higher than 0, revert
         require(
             msg.value > 0,
             "You cannot bid 0 as the price."
@@ -357,30 +358,30 @@ contract Bidding {
        Bid storage newBid = bids[bidCounter+1];
        newBid.bidder = payable(msg.sender);
        newBid.bidAmount = msg.value;
-       
-       bidCounter = bidCounter+1;
+       emit newbid(msg.sender, msg.value);
+       bidCounter++;
     }
     
     /*
-    * Get the address of the highest bidder
+    * Get the address and bid of the highest bidder
     */
-    function highestBidder() onlyAdmin public returns(address) {
+    function highestBidder() onlyAdmin public returns(address,uint) {
         
         uint highestBidValue;
         
-        highestBidValue = bids[0].bidAmount;
+        //highestBidValue = bids[0].bidAmount;
         highestBidAddress = address(0);
         
         for(uint i = 0; i <= bidCounter ; i ++){
             
             if(bids[i].bidAmount > highestBidValue) {
-                highestBidValue = bids[i].bidAmount;
+                highestBid = bids[i].bidAmount;
                 highestBidAddress = bids[i].bidder;
             }
                 
         }
         
-        return highestBidAddress;
+        return (highestBidAddress,highestBid);
         
     }
     
@@ -480,8 +481,8 @@ contract Bidding {
         // 2. Effects
         ended = true;
 
-        // 3. Get the highest bidder 
-        highestBidAddress = highestBidder();
+        // 3. Get the highest bidder and amount
+        (highestBidAddress,highestBid) = highestBidder();
         
          //4. Send the money to the owner and the charity
         highestBid = highestBidAmount(highestBidAddress);
