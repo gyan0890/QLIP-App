@@ -8,7 +8,6 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contr
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/access/AccessControlEnumerable.sol";
 
 contract QLIPMarketplace is ERC721URIStorage, AccessControl{
-
 	using Counters for Counters.Counter;
     Counters.Counter private _tokenIds;
 	mapping(uint256 => uint256) private itemIndex;
