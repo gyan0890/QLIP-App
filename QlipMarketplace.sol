@@ -12,7 +12,10 @@ contract QLIPMarketplace is ERC721URIStorage{
     Counters.Counter private _tokenIds;
 	mapping(uint256 => uint256) private itemIndex;
 	mapping(uint256 => uint256) private salePrice;
-
+	
+	event Minted(address minter, string tokenURI, uint256 tokenId);
+    event SetSale(address seller, uint256 tokenId);
+    event BuyToken(address seller, address buyer, uint256 tokenId);
 
 	constructor(string memory _name, string memory _symbol) ERC721(_name, _symbol) {
 
@@ -23,6 +26,8 @@ contract QLIPMarketplace is ERC721URIStorage{
         require(owner != address(0), "setSale: nonexistent token");
         require(owner == msg.sender, "setSale: msg.sender is not the owner of the token");
 		salePrice[tokenId] = price;
+		
+		emit SetSale(msg.sender, tokenId);
 	}
 
 	function buyTokenOnSale(uint256 tokenId) public payable {
@@ -32,8 +37,11 @@ contract QLIPMarketplace is ERC721URIStorage{
 		address payable owner = payable((ownerOf(tokenId)));
 		approve(address(this), tokenId);
 		salePrice[tokenId] = 0;
+		
 		transferFrom(owner, msg.sender, tokenId);
         owner.transfer(msg.value);
+        
+        emit BuyToken(owner, msg.sender, tokenId);
 	}
 
 	function mintWithIndex(address to, string memory tokenURI) public  {
@@ -44,6 +52,7 @@ contract QLIPMarketplace is ERC721URIStorage{
         
         //Here, we will set the metadata hash link of the token metadata from Pinata
         _setTokenURI(tokenId, tokenURI);
+        emit Minted(msg.sender, tokenURI, tokenId);
 	}
 	
 
