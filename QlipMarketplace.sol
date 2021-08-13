@@ -39,15 +39,16 @@ contract QLIPMarketplace is ERC721URIStorage, AccessControl{
 	NFTDet[] qlipNFTs;
 	NFTStateMapping[] nftStates;
 	
+	event Minted(address minter, string tokenURI, uint256 tokenId);
+    event SetSale(address seller, uint256 tokenId);
+    event BuyToken(address seller, address buyer, uint256 tokenId);
+	
 	
 	modifier onlyAdmin() {
 	    require(msg.sender == admin);
 	    _;
 	}
 
-    event Minted(address minter, string tokenURI, uint256 tokenId);
-    event SetSale(address seller, uint256 tokenId);
-    event BuyToken(address seller, address buyer, uint256 tokenId);
     
 	constructor(string memory _name, string memory _symbol) ERC721(_name, _symbol) {
 
@@ -109,8 +110,8 @@ contract QLIPMarketplace is ERC721URIStorage, AccessControl{
 		//No royalty here, just flash sale and done!
 		qlipAddress.transfer(qlipAmount);
         owner.transfer(ownerAmount);
-	
-	emit BuyToken(owner, msg.sender, tokenId);
+        
+        emit BuyToken(owner, msg.sender, tokenId);
 	}
 
     function mintWithIndex(address to, string memory tokenURI,uint16 _category) public  {
@@ -134,9 +135,8 @@ contract QLIPMarketplace is ERC721URIStorage, AccessControl{
         if(QLIPMinters[msg.sender] == true){
             qlipNFTs.push(TokenDetails[tokenId]);
         }
-	
-	 emit Minted(msg.sender, tokenURI, tokenId);
-	
+        
+         emit Minted(msg.sender, tokenURI, tokenId);
 	}
 
 
