@@ -4,10 +4,9 @@ pragma solidity ^0.8.0;
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC721/ERC721.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/Counters.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/access/AccessControl.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/access/AccessControlEnumerable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC721/IERC721Receiver.sol";
 
-contract QLIPMarketplace is ERC721URIStorage, AccessControl{
+contract QLIPMarketplace is ERC721URIStorage, IERC721Receiver{
 	using Counters for Counters.Counter;
     Counters.Counter private _tokenIds;
 	mapping(uint256 => uint256) private itemIndex;
@@ -15,6 +14,9 @@ contract QLIPMarketplace is ERC721URIStorage, AccessControl{
 	mapping(uint256=> NFTDet) public TokenDetails;
     mapping(uint256 => NFTStateMapping) public NFTSTates;
 	address public admin;
+	
+	//50000000000000000
+	//0x5d519e11E98Cd230D3e8d18C12E740D449fd05cD
 	
 	enum NFTState {
 	    MINTED,
@@ -35,6 +37,7 @@ contract QLIPMarketplace is ERC721URIStorage, AccessControl{
     }
     
     mapping(address => bool) QLIPMinters;
+	mapping(uint256 => address) nftOwners;
 	
 	NFTDet[] qlipNFTs;
 	NFTStateMapping[] nftStates;
@@ -54,27 +57,33 @@ contract QLIPMarketplace is ERC721URIStorage, AccessControl{
 
         admin = msg.sender;
         
-        //Need to fill this up based on Pinata
-        //_setBaseURI("https://example.com/tokens/");
     }
     
-    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC721, AccessControl) returns (bool) {
+    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC721) returns (bool) {
         return super.supportsInterface(interfaceId);
     }
     
     function whiteListQLIPMinters(address qlipMinter) public onlyAdmin {
-
         QLIPMinters[qlipMinter] = true;
-
     }
     
+    function onERC721Received(
+        address operator,
+        address from,
+        uint256 tokenId,
+        bytes calldata data
+    ) public pure override returns (bytes4) {
+        return(bytes4(keccak256("onERC721Received(address,address,uint256,bytes)")));
+    }
 
-	function setSale(uint256 tokenId, uint256 price) public onlyAdmin {
-	    //require(hasRole(ADMIN_ROLE, msg.sender), "QLIPMarketplace: Only the admin can set the token for sale");
-		address owner = ownerOf(tokenId);
+	function setSale(uint256 tokenId, uint256 price, address _nftAddress) public {
+	    ERC721 nftAddress = ERC721(_nftAddress);
+		address owner = nftAddress.ownerOf(tokenId);
         require(owner != address(0), "setSale: nonexistent token");
+        require(msg.sender == owner);
         
-        //Change the state of the minted NFT
+        nftOwners[tokenId] = owner;
+        
         if(NFTSTates[tokenId].tokenId == 0) {
             NFTStateMapping memory nftStateChange = NFTStateMapping(tokenId, NFTState.ONSALE);
             NFTSTates[tokenId] = nftStateChange;
@@ -87,31 +96,37 @@ contract QLIPMarketplace is ERC721URIStorage, AccessControl{
             NFTSTates[tokenId] = nftStateChange;
         }
 		salePrice[tokenId] = price;
+		nftAddress.safeTransferFrom(msg.sender, address(this), tokenId);
 		emit SetSale(msg.sender, tokenId);
 	}
 
-	function buyTokenOnSale(uint256 tokenId) public payable {
+	function buyTokenOnSale(uint256 tokenId, address _nftAddress, uint256 _qlipAmount) public payable{
+	    ERC721 nftAddress = ERC721(_nftAddress);
+
 		uint256 price = salePrice[tokenId];
         require(price != 0, "buyToken: price equals 0");
         require(msg.value == price, "buyToken: price doesn't equal salePrice[tokenId]");
-		address payable owner = payable(address(uint160(ownerOf(tokenId))));
-		approve(address(this), tokenId);
-		salePrice[tokenId] = 0;
+		address payable nftOwner = payable(nftOwners[tokenId]);
+		
+		
 		
 		NFTStateMapping memory nftStateChange = NFTSTates[tokenId];
         nftStateChange.nftState = NFTState.SOLD;
         NFTSTates[tokenId] = nftStateChange;
 		
-		transferFrom(owner, msg.sender, tokenId);
-		uint256 qlipAmount = msg.value * (1 ether * 0.05);
+		nftAddress.transferFrom(address(this), msg.sender, tokenId);
+
+		uint256 qlipAmount = _qlipAmount;
 		uint256 ownerAmount = msg.value - qlipAmount;
 		address payable qlipAddress = payable(admin);
 		
 		//No royalty here, just flash sale and done!
 		qlipAddress.transfer(qlipAmount);
-        owner.transfer(ownerAmount);
+        nftOwner.transfer(ownerAmount);
         
-        emit BuyToken(owner, msg.sender, tokenId);
+        salePrice[tokenId] = 0;
+        emit BuyToken(nftOwner, msg.sender, tokenId);
+
 	}
 
     function mintWithIndex(address to, string memory tokenURI,uint16 _category) public  {
