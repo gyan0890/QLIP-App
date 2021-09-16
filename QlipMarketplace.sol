@@ -184,6 +184,21 @@ contract QLIPMarketplace is ERC721URIStorage, IERC721Receiver{
 	    return allTokens;
 	}
 	
+	function getNftByAddress(address _nftAddress) public view returns(uint256[] memory) {
+	    address userAddress = _nftAddress;
+	    uint256[] memory userTokens;
+	    uint256 j = 0;
+	    for(uint256 i =0; i < allTokens.length; i++){
+	        if(ownerOf(allTokens[i]._id) == userAddress){
+	            userTokens[j] = allTokens[i]._id;
+	            j +=1;
+	        }
+	    }
+	    
+	    return userTokens;
+	    
+	}
+	
 	    function getNFTState(uint256 tokenId) public view returns(NFTState) {
 	        return NFTSTates[tokenId].nftState;
 	    }
