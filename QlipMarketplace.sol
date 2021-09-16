@@ -8,7 +8,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contr
 
 contract QLIPMarketplace is ERC721URIStorage, IERC721Receiver{
 	using Counters for Counters.Counter;
-    Counters.Counter private _tokenIds;
+    Counters.Counter public _tokenIds;
 	mapping(uint256 => uint256) private itemIndex;
 	mapping(uint256 => uint256) private salePrice;
 	mapping(uint256=> NFTDet) public TokenDetails;
@@ -26,10 +26,11 @@ contract QLIPMarketplace is ERC721URIStorage, IERC721Receiver{
 	}
 	
 	struct NFTDet{
+	  address ownerAddress;
       uint256 _id;
       uint16 _category;
       string tokenURI_;
-  }
+    }
   
     struct NFTStateMapping {
         uint256 tokenId;
@@ -39,8 +40,9 @@ contract QLIPMarketplace is ERC721URIStorage, IERC721Receiver{
     mapping(address => bool) QLIPMinters;
 	mapping(uint256 => address) nftOwners;
 	
-	NFTDet[] qlipNFTs;
-	NFTStateMapping[] nftStates;
+	NFTDet[] public qlipNFTs;
+	NFTStateMapping[] public nftStates;
+	NFTDet[] public allTokens;
 	
 	event Minted(address minter, string tokenURI, uint256 tokenId);
     event SetSale(address seller, uint256 tokenId);
@@ -95,6 +97,12 @@ contract QLIPMarketplace is ERC721URIStorage, IERC721Receiver{
             nftStateChange.nftState = NFTState.ONSALE;
             NFTSTates[tokenId] = nftStateChange;
         }
+        
+        if(TokenDetails[tokenId].ownerAddress == address(0)) {
+             TokenDetails[tokenId].ownerAddress = owner ;
+             TokenDetails[tokenId]._id=tokenId;
+             allTokens.push(TokenDetails[tokenId]);
+        }
 		salePrice[tokenId] = price;
 		nftAddress.safeTransferFrom(msg.sender, address(this), tokenId);
 		emit SetSale(msg.sender, tokenId);
@@ -137,6 +145,7 @@ contract QLIPMarketplace is ERC721URIStorage, IERC721Receiver{
         
         _mint(to, tokenId);
         
+        TokenDetails[tokenId].ownerAddress = to;
         TokenDetails[tokenId]._id=tokenId;
         TokenDetails[tokenId]._category=_category;
        _setTokenURI(tokenId, tokenURI);
@@ -151,6 +160,8 @@ contract QLIPMarketplace is ERC721URIStorage, IERC721Receiver{
             qlipNFTs.push(TokenDetails[tokenId]);
         }
         
+        allTokens.push(TokenDetails[tokenId]);
+        
          emit Minted(msg.sender, tokenURI, tokenId);
 	}
 
@@ -161,11 +172,16 @@ contract QLIPMarketplace is ERC721URIStorage, IERC721Receiver{
 	
 	
 		function getAllTokenDetails(uint256 tokenId) public view returns(NFTDet memory Details){
+		Details.ownerAddress = TokenDetails[tokenId].ownerAddress;
 	    Details._id=TokenDetails[tokenId]._id;
 	    Details._category=TokenDetails[tokenId]._category;
 	    Details.tokenURI_=TokenDetails[tokenId].tokenURI_;
 	     //Here, we will set the metadata hash link of the token metadata from Pinata
         
+	}
+	
+	function getAllTokens() public view returns(NFTDet[] memory) {
+	    return allTokens;
 	}
 	
 	    function getNFTState(uint256 tokenId) public view returns(NFTState) {
